@@ -501,4 +501,4 @@ Now let's have a look at the patient groups that represent a patient primary dis
 p1 | p2 | p3
 ```
 
-<img src="meta_analysis1_files/figure-html/unnamed-chunk-2-1.png" width="100%" />
+<img src="meta_analysis1_files/figure-html/unnamed-chunk-2-1.png" width="70%" />
