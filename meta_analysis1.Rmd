@@ -1,0 +1,53 @@
+---
+title: "Meta-data"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Load R packages and data set
+
+```{r package, echo=TRUE, message = FALSE}
+library(dplyr)
+library(meta)
+library(metafor)
+library(dmetar)
+library(kableExtra)
+library(ggplot2)
+data_meta <- read.csv("data_YESadded.csv", header = TRUE)
+```
+
+## Tidy up the data frame
+
+At the first stage of the project, we will perform exploratory analysis and will only work with data from manuscripts, which reported age as mean and standard deviation either directly or via email.
+
+For this we will first select only data where `mean_report` is indicated as YES.
+Check the structure of the data frame and delete columns which are not necessary, for instance columns that report median. Next, check the structure of obtained data frame. 
+From seeing the structure, we can also see that some data is not stored correctly. For example, `n_noIA` is saved as character when it should be numeric. To overcome this, transform all data that will be used for computation into a numeric class. 
+Replace `NA` with `not_reported`
+Display the table.
+```{r pressure, echo=TRUE}
+data_mean_r <- filter(data_meta, mean_report == "YES", .preserve = TRUE)
+str(data_mean_r)
+
+data_mean_rS <- select(data_mean_r,-c(N,md_IA,md_noIA,R1_IA,R2_IA,R1_noIA,R2_noIA, mean_report))
+data_mean_rS$n_IA <- as.numeric(data_mean_rS$n_IA)
+data_mean_rS$n_noIA <- as.numeric(data_mean_rS$n_noIA)
+data_mean_rS$ICU <- ifelse(data_mean_rS$ICU=="YES",1,0)
+data_mean_rS$prophylaxis <- ifelse(data_mean_rS$prophylaxis=="YES",1,0)
+
+data_mean_rS %>%
+  kbl() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), font_size = 11) %>%
+  column_spec(6, color = "white",
+              background = spec_color(data_mean_rS$n_noIA, end = 0.7),
+              popover = paste("am:", data_mean_rS$n_noIA)) 
+  
+```
+
+Now lets have a look at the patient groups that represent a patient primary disease from each study. By looking at the histogram we can see how many observations we have for each group.
+```{r}
+ggplot(data_mean_rS) + geom_bar(aes(x = patient_g)) + coord_flip()
+```
