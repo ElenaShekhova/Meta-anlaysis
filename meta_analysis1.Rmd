@@ -24,7 +24,7 @@ data_meta <- read.csv("data_YESadded.csv", header = TRUE)
 At the first stage of the project, we will perform exploratory analysis and will only work with data from manuscripts, which reported age as mean and standard deviation either directly or via email.
 
 For this we will first select only data where `mean_report` is indicated as YES.
-Check the structure of the data frame and delete columns which are not necessary, for instance columns that report median. Next, check the structure of obtained data frame. 
+Check the structure of the data frame and delete columns which are not necessary, for instance columns that report median.  
 From seeing the structure, we can also see that some data is not stored correctly. For example, `n_noIA` is saved as character when it should be numeric. To overcome this, transform all data that will be used for computation into a numeric class. 
 Replace `NA` with `not_reported`
 Display the table.
