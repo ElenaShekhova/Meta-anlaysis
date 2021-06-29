@@ -494,6 +494,12 @@ data_mean_rS %>%
 
 Now let's have a look at the patient groups that represent a patient primary disease from each study. By looking at the histogram we can see how many observations we have for each group.
 
+```r
+p1 <- ggplot(data_mean_rS) + geom_bar(aes(x = patient_g)) + coord_flip()
+p2 <- ggplot(data_mean_rS) + geom_bar(aes(x = YEAR)) 
+data_mean_rS_noNA <- na.omit(subset(data_mean_rS, select = c(study_class)))
+p3 <- ggplot(data_mean_rS_noNA) + geom_bar(aes(x = study_class)) 
+```
 
 
 
