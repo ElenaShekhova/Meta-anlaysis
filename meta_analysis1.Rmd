@@ -24,12 +24,15 @@ data_meta <- read.csv("data_YESadded.csv", header = TRUE)
 
 ## Tidy up the data frame
 
-At the first stage of the project, we will perform exploratory analysis and will only work with data from manuscripts, which reported age as mean and standard deviation either directly or via email.
+At the first stage of the project, we will perform an exploratory analysis and will only work with data from manuscripts, which reported age as the mean and standard deviation either directly or via email.
 
-For this we will first select only data where `mean_report` is indicated as YES.
-Then, we will check the structure of the data frame and delete columns which are not necessary, for instance columns that report median.  
-From seeing the structure, we can also see that some data is not stored correctly. For example, `n_noIA` is saved as character when it should be numeric. To overcome this, transform all data that will be used for computation into a numeric class. 
+For this we will first select only data where `mean_report` was labeled as YES.
+Then, we will check the structure of the data frame and delete columns which are not necessary, for instance, columns which report the median and range. 
+
+From seeing the structure of the data frame, we can also notice that some data is not stored correctly. For example, `n_noIA` is saved as a character when it should be numeric. To overcome this, transform all data that will be used for computation into a numeric class.
+
 Display the table.
+
 ```{r pressure, echo=TRUE}
 data_mean_r <- filter(data_meta, mean_report == "YES", .preserve = TRUE)
 str(data_mean_r)
@@ -49,7 +52,9 @@ data_mean_rS %>%
   
 ```
 
-Now let's have a look at the patient groups that represent a patient primary disease from each study. By looking at the histogram we can see how many observations we have for each group.
+## Have a quick look at the data
+Now let's have a look at the patient groups, which represent their primary disease reported in each study. By looking at the histogram we can see how many observations we have for each group.
+
 ```{r, include=TRUE}
 p1 <- ggplot(data_mean_rS) + geom_bar(aes(x = patient_g)) + coord_flip()
 p2 <- ggplot(data_mean_rS) + geom_bar(aes(x = YEAR)) 
@@ -61,3 +66,57 @@ p3 <- ggplot(data_mean_rS_noNA) + geom_bar(aes(x = study_class))
 ```{r, out.width = '70%'}
 p1 | p2 | p3
 ```
+
+## Calculate effect sizes as the raw mean differences
+We can calculate effect size, presented in this instance as a raw mean difference. We will then pool effect sizes by using the `metafor` package.
+```{r}
+dat1 <- escalc(measure="MD", m1i=m_age_IA, sd1i=SD_IA, n1i=n_IA,
+                              m2i=m_age_noIA, sd2i=SD_noIA, n2i=n_noIA, data=data_mean_rS)
+res1 <- rma(yi, vi, data=dat1)
+res1
+forest(res1)
+```
+
+## Calculate effect sizes as the standardized mean differences
+Next, the `meta` package will be used to calculate the standardized mean difference.
+
+```{r}
+m.cont <- metacont(n.e = n_IA,
+                   mean.e = m_age_IA,
+                   sd.e = SD_IA,
+                   n.c = n_noIA,
+                   mean.c = m_age_noIA,
+                   sd.c = SD_noIA,
+                   studlab = AUTHORS,
+                   data = data_mean_rS,
+                   sm = "SMD",
+                   method.smd = "Hedges",
+                   comb.fixed = FALSE,
+                   comb.random = TRUE,
+                   method.tau = "REML",
+                   hakn = TRUE,
+                   title = "Age as a risk factor for IA",
+                   prediction = TRUE)
+m.cont
+
+```
+
+## Check for potential outliers
+Let's check if our data contains any outliers or influential cases that may affect robustness of the result.
+```{r}
+m.count.no <- find.outliers(m.cont)  
+m.count.no
+m.cont.inf <- InfluenceAnalysis(m.cont, random = TRUE)
+plot(m.cont.inf, "influence")
+```
+
+It seems that the data contains the outlier that has a substantial effect on heterogeneity. 
+
+Let's further check if the removal of any data point from our data frame significantly impacts the overall heterogeneity. 
+
+```{r}
+
+plot(m.cont.inf, "es")
+plot(m.cont.inf, "i2")
+```
+
