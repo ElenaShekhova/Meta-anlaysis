@@ -19,76 +19,183 @@ library(dmetar)
 library(kableExtra)
 library(ggplot2)
 library(patchwork)
-data_meta <- read.csv("data_YESadded.csv", header = TRUE)
+data_meta <- read.csv("data_YESadded2.csv", header = TRUE)
 ```
 
 ## Tidy up the data frame
 
-At the first stage of the project, we will perform an exploratory analysis and will only work with data from manuscripts, which reported age as the mean and standard deviation either directly or via email.
+We need to remove studies where it was not possible to extract complete information about patients. These studies would have `n_IA` labeled as `NA`. We will remove them using the function `filter`.
 
-For this we will first select only data where `mean_report` was labeled as YES.
-Then, we will check the structure of the data frame and delete columns which are not necessary, for instance, columns which report the median and range. 
+Arrange data into groups according to a primary disease of patients. This information is stored in `patient_g` column. During this step, the `mutate` function will be utilized. We will divide data into two categories:
 
-From seeing the structure of the data frame, we can also notice that some data is not stored correctly. For example, `n_noIA` is saved as a character when it should be numeric. To overcome this, transform all data that will be used for computation into a numeric class.
+1. Patients with blood disorders will be assigned to the `hematologic disease` group
+2. All other patients will go to `other` group
 
-Display the table.
+```{r}
+data_mean_r <- filter(data_meta, n_IA != "NA", .preserve = TRUE)
 
-```{r pressure, echo=TRUE}
-data_mean_r <- filter(data_meta, mean_report == "YES", .preserve = TRUE)
-str(data_mean_r)
-
-data_mean_rS <- select(data_mean_r,-c(N,md_IA,md_noIA,R1_IA,R2_IA,R1_noIA,R2_noIA, mean_report))
-data_mean_rS$n_IA <- as.numeric(data_mean_rS$n_IA)
-data_mean_rS$n_noIA <- as.numeric(data_mean_rS$n_noIA)
-data_mean_rS$ICU <- ifelse(data_mean_rS$ICU=="YES",1,0)
-data_mean_rS$prophylaxis <- ifelse(data_mean_rS$prophylaxis=="YES",1,0)
-
-data_mean_rS %>%
-  kbl() %>%
-  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), font_size = 11) %>%
-  column_spec(6, color = "white",
-              background = spec_color(data_mean_rS$n_noIA, end = 0.7),
-              popover = paste("am:", data_mean_rS$n_noIA)) 
-  
+data_mean_rg <- data_mean_r %>%
+               select(STUDY_ID:mean_report) %>%
+               mutate(Patient_classification = case_when(
+                 patient_g == "COVID19"  ~ "other",
+                 patient_g == "vv_ECMO"  ~ "other",
+                 patient_g == "pneumonia"  ~ "other",
+                 patient_g == "liver_failure"  ~ "other",
+                 patient_g == "kidney_transplantation"  ~ "other",
+                 patient_g == "interstitial_pneumonia"  ~ "other",
+                 patient_g == "influenza"  ~ "other",
+                 patient_g == "hematology_oncology"  ~ "hematologic disease",
+                 patient_g == "heart_transplanaion"  ~ "other",
+                 patient_g == "febrile_neutropenic"  ~ "hematologic disease",
+                 patient_g == "cystic_fibrosis"  ~ "other",
+                 patient_g == "critically_ill"  ~ "other",
+                 patient_g == "COPD"  ~ "other",
+                 patient_g == "cirrhosis"  ~ "other",
+                 patient_g == "cardiac_transplantation"  ~ "other",
+                 patient_g == "ARDS"  ~ "other",
+                 patient_g == "allogeneic_stem"  ~ "hematologic disease",
+                 patient_g == "allogeneic_SCT"  ~ "hematologic disease",
+                 patient_g == "allogeneic_HSCT"  ~ "hematologic disease",
+                 patient_g == "allogeneic_HCT "  ~ "hematologic disease",
+                 patient_g == "acute_myeloid_leukemia"  ~ "hematologic disease"
+               )
+               )
 ```
 
-## Have a quick look at the data
-Now let's have a look at the patient groups, which represent their primary disease reported in each study. By looking at the histogram we can see how many observations we have for each group.
+Let's have a quick overview of the data accumulated. We will explore a relative number of studies in a data set according to a patient's group, year of publication and study design. 
 
-```{r, include=TRUE}
-p1 <- ggplot(data_mean_rS) + geom_bar(aes(x = patient_g)) + coord_flip()
-p2 <- ggplot(data_mean_rS) + geom_bar(aes(x = YEAR)) 
-data_mean_rS_noNA <- na.omit(subset(data_mean_rS, select = c(study_class)))
-p3 <- ggplot(data_mean_rS_noNA) + geom_bar(aes(x = study_class)) 
+```{r}
+p1 <- ggplot(data_mean_rg) + geom_bar(aes(x = Patient_classification)) 
+p2 <- ggplot(data_mean_rg) + geom_bar(aes(x = YEAR)) 
+data_mean_rg_noNA <- na.omit(subset(data_mean_rg, select = c(study_class)))
+p3 <- ggplot(data_mean_rg_noNA) + geom_bar(aes(x = study_class)) 
 ```
 
+By looking at the histogram we can see how many observations (counts) we have for each group.
 
 ```{r, out.width = '70%'}
 p1 | p2 | p3
 ```
 
-## Calculate effect sizes as the raw mean differences
-We can calculate effect size, presented in this instance as a raw mean difference. We will then pool effect sizes by using the `metafor` package.
-```{r}
-dat1 <- escalc(measure="MD", m1i=m_age_IA, sd1i=SD_IA, n1i=n_IA,
-                              m2i=m_age_noIA, sd2i=SD_noIA, n2i=n_noIA, data=data_mean_rS)
-res1 <- rma(yi, vi, data=dat1)
-res1
-forest(res1)
+
+Next, we will check the structure of the data frame. From seeing the structure, we can notice that some data is not stored correctly. For example, `n_noIA` is saved as a character when it should be numeric. To overcome this, transform all data that will be used for computation into a numeric class.
+
+```{r pressure, echo=TRUE}
+str(data_mean_rg)
+
+data_mean_rg$n_IA <- as.numeric(data_mean_rg$n_IA)
+data_mean_rg$n_noIA <- as.numeric(data_mean_rg$n_noIA)
+#data_mean_rg$ICU <- ifelse(data_mean_rg$ICU=="YES",1,0)
+#data_mean_rg$prophylaxis <- ifelse(data_mean_rg$prophylaxis=="YES",1,0)
+
 ```
 
-## Calculate effect sizes as the standardized mean differences
-Next, the `meta` package will be used to calculate the standardized mean difference.
+##Prepare summary table
+Let's prepare a table to present main information about collected data. This table will include following columns: first author, year of publication, underlying condition, group, total sample  size, type of study, incidence (if cohort).
+First, we need to transform the column with information about patient's primary disease in a more readable format. For this we will create a new column `underlying_condition` and re-name each illness.
 
 ```{r}
-m.cont <- metacont(n.e = n_IA,
+data_mean_rT <- data_mean_rg %>%
+               mutate(Underlying_condition = case_when(
+                 patient_g == "COVID19"  ~ "COVID19",
+                 patient_g == "vv_ECMO"  ~ "critically ill",
+                 patient_g == "pneumonia"  ~ "pneumonia",
+                 patient_g == "liver_failure"  ~ "liver failure",
+                 patient_g == "kidney_transplantation"  ~ "kidney transplantation",
+                 patient_g == "interstitial_pneumonia"  ~ "interstitial pneumonia",
+                 patient_g == "influenza"  ~ "influenza",
+                 patient_g == "hematology_oncology"  ~ "hematology",
+                 patient_g == "heart_transplanaion"  ~ "heart transplanaion",
+                 patient_g == "febrile_neutropenic"  ~ "febrile neutropenia",
+                 patient_g == "cystic_fibrosis"  ~ "cystic fibrosis",
+                 patient_g == "critically_ill"  ~ "critically ill",
+                 patient_g == "COPD"  ~ "COPD",
+                 patient_g == "cirrhosis"  ~ "cirrhosis",
+                 patient_g == "cardiac_transplantation"  ~ "heart transplantation",
+                 patient_g == "ARDS"  ~ "ARDS",
+                 patient_g == "allogeneic_stem"  ~ "stem cell transplantation",
+                 patient_g == "allogeneic_SCT"  ~ "stem cell transplantation",
+                 patient_g == "allogeneic_HSCT"  ~ "stem cell transplantation",
+                 patient_g == "allogeneic_HCT "  ~ "stem cell transplantation",
+                 patient_g == "acute_myeloid_leukemia"  ~ "acute myeloid leukemia"
+               )
+               )
+```
+
+Now, we will create an additional column that sums the number of patients in each study.
+Then, we will create a function that will calculate the occurrence of invasive aspergillosis in cohort studies.
+
+```{r}
+data_mean_rT1 <- mutate(data_mean_rT, Total_sample_size = n_noIA + n_IA) 
+#create function
+incidence_cal <- function (data, only)
+{
+  noIA <- data$n_noIA
+  IA <- data$n_IA
+  incidence <- IA/(noIA+IA)*100
+  
+  result <- ifelse(data$study_class == only, incidence, NA)
+  
+  return (result)
+}
+
+data_mean_rT2 <- data_mean_rT1
+data_mean_rT2$Incidence <- incidence_cal(data_mean_rT2, "cohort")
+
+```
+
+Now, we will finally arrange a table and choose specific columns that should be there.
+
+```{r}
+data_mean_rT3 <- select(data_mean_rT2, AUTHORS, YEAR, Underlying_condition, Total_sample_size, study_class, Incidence)
+```
+We have to tidy up the table now. For this, we will fist round values representing incidence and also change the names of the columns. Here, we will start using `%>%`, which is a pipe operator that allows to chain functions together in a convenient fashion. This operator is a part of `dplyr` package. 
+
+```{r}
+data_mean_rT4 <- data_mean_rT3 %>%
+                 mutate_if(is.numeric, round) %>%
+                 rename(First_author = AUTHORS,
+                        Year_of_publication = YEAR,
+                        Incedence_percentage = Incidence, 
+                        Study_class = study_class)
+data_mean_rT4 %>%
+  kbl() %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), font_size = 11) %>%
+  column_spec(6, color = "white",
+              background = spec_color(data_mean_rT4$Total_sample_size, end = 0.7),
+              popover = paste("am:", data_mean_rT4$Total_sample_size)) 
+```
+
+
+## Calculate effect sizes as the standardized mean differences
+Next, the `meta` package will be used to calculate the standardized mean difference. Here, we will go to our original data frame `data_mean_rT2`.
+For computational manipulations, some information is better stored in `1` that represents `yes` and `0` that represents `no`. 
+
+```{r}
+data_mean_rT2$ICU <- ifelse(data_mean_rT2$ICU=="YES",1,0)
+data_mean_rT2$prophylaxis <- ifelse(data_mean_rT2$prophylaxis=="YES",1,0)
+data_mean_rT2$study_class <- ifelse(data_mean_rT2$study_class=="cohort",1,0)
+```
+
+Let's make a first analysis and have a look at the first results.
+```{r}
+#data_meta_del.ou <- data_meta[-c(9,16,18,26,36), ]
+meta_med <- metacont(n.e = n_IA,
                    mean.e = m_age_IA,
                    sd.e = SD_IA,
                    n.c = n_noIA,
                    mean.c = m_age_noIA,
                    sd.c = SD_noIA,
                    studlab = AUTHORS,
-                   data = data_mean_rS,
+                   data = data_mean_rT2,
+                   median.e = md_IA,
+                   q1.e = R1_IA,
+                   q3.e = R2_IA,
+                   median.c = md_noIA,
+                   q1.c = R1_noIA,
+                   q3.c = R2_noIA,
+                   method.mean = "Luo",
+                   method.sd = "Shi",
                    sm = "SMD",
                    method.smd = "Hedges",
                    comb.fixed = FALSE,
@@ -97,20 +204,37 @@ m.cont <- metacont(n.e = n_IA,
                    hakn = TRUE,
                    title = "Age as a risk factor for IA",
                    prediction = TRUE)
-m.cont
+png(file = "forestplot_med.png", width = 2800, height = 2400, res = 300)
+forest.meta(meta_med, 
+            sortvar = TE,
+            predict = TRUE, 
+            print.tau2 = FALSE,
+            leftcols = c("studlab", "TE", "seTE"),
+            leftlabs = c("Author", "g", "SE"),
+            label.left = "Younger",
+            label.right = "Older")
+dev.off()
+
+meta_med
 
 ```
+
+```{r}
+knitr::include_graphics(rep("forestplot_med.png", 1))
+```
+
+Based on the first result we can see that the heterogeneity is not trivial and that we need to check if there are potential data points that strongly influence the outcome. 
 
 ## Check for potential outliers
 Let's check if our data contains any outliers or influential cases that may affect robustness of the result.
 ```{r}
-m.count.no <- find.outliers(m.cont)  
+m.count.no <- find.outliers(meta_med)  
 m.count.no
-m.cont.inf <- InfluenceAnalysis(m.cont, random = TRUE)
+m.cont.inf <- InfluenceAnalysis(meta_med, random = TRUE)
 plot(m.cont.inf, "influence")
 ```
 
-It seems that the data contains the outlier that has a substantial effect on heterogeneity. 
+It seems that the data contains outliers that may have a substantial effect on heterogeneity. 
 
 Let's further check if the removal of any data point from our data frame significantly impacts the overall heterogeneity. 
 
@@ -118,5 +242,96 @@ Let's further check if the removal of any data point from our data frame signifi
 
 plot(m.cont.inf, "es")
 plot(m.cont.inf, "i2")
+```
+
+
+Omitting the outlier named `Kaya, S` significantly changed the effect size and I^2, suggesting that it is true outlier. At the same time, another potential outlier `Seok, H` did not significantly changed those parameters. It was decided to leave that data point in a further analysis. 
+ 
+
+```{r}
+meta_med_del_ou1 <-data_mean_rT2[data_mean_rT2$AUTHORS !="Kaya, S", ]
+
+data_meta2 <- metacont(n.e = n_IA,
+                   mean.e = m_age_IA,
+                   sd.e = SD_IA,
+                   n.c = n_noIA,
+                   mean.c = m_age_noIA,
+                   sd.c = SD_noIA,
+                   studlab = AUTHORS,
+                   data = meta_med_del_ou1,
+                   median.e = md_IA,
+                   q1.e = R1_IA,
+                   q3.e = R2_IA,
+                   median.c = md_noIA,
+                   q1.c = R1_noIA,
+                   q3.c = R2_noIA,
+                   method.mean = "Luo",
+                   method.sd = "Shi",
+                   sm = "SMD",
+                   method.smd = "Hedges",
+                   comb.fixed = FALSE,
+                   comb.random = TRUE,
+                   method.tau = "REML",
+                   hakn = TRUE,
+                   title = "Age as a risk factor for IA",
+                   prediction = TRUE)
+png(file = "forestplot_med_del_ou.png", width = 2800, height = 2400, res = 300)
+forest.meta(data_meta2, 
+            sortvar = TE,
+            predict = TRUE, 
+            print.tau2 = FALSE,
+            leftcols = c("studlab", "TE", "seTE"),
+            leftlabs = c("Author", "g", "SE"),
+            label.left = "Younger",
+            label.right = "Older")
+dev.off()
+
+data_meta2
+```
+
+```{r}
+knitr::include_graphics(rep("forestplot_med_del_ou.png", 1))
+```
+
+Now I want to perform a group analysis and check if patients with hematologic disease had a significantly different age difference than patients with other underlying conditions. 
+
+```{r}
+data_mean_rg_gr <- metacont(n.e = n_IA,
+                            mean.e = m_age_IA,
+                            sd.e = SD_IA,
+                            n.c = n_noIA,
+                            mean.c = m_age_noIA,
+                            sd.c = SD_noIA,
+                            studlab = AUTHORS,
+                            data = meta_med_del_ou1,
+                            median.e = md_IA,
+                            q1.e = R1_IA,
+                            q3.e = R2_IA,
+                            median.c = md_noIA,
+                            q1.c = R1_noIA,
+                            q3.c = R2_noIA,
+                            method.mean = "Luo",
+                            method.sd = "Shi",
+                            sm = "SMD",
+                            method.smd = "Hedges",
+                            comb.fixed = FALSE,
+                            comb.random = TRUE,
+                            method.tau = "REML",
+                            hakn = TRUE,
+                            title = "Age as a risk factor for IA",
+                            prediction = TRUE, 
+                            byvar = Patient_classification)
+png(file = "forestplot_med_del_GR.png", width = 2800, height = 2400, res = 300)
+forest.meta(data_mean_rg_gr, 
+            sortvar = TE,
+            predict = TRUE, 
+            print.tau2 = FALSE,
+            leftcols = c("studlab", "TE", "seTE"),
+            leftlabs = c("Author", "g", "SE"),
+            label.left = "Younger",
+            label.right = "Older")
+dev.off()
+
+knitr::include_graphics(rep("forestplot_med_del_GR.png", 1))
 ```
 
