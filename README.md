@@ -23,12 +23,15 @@ data_meta <- read.csv("data_YESadded.csv", header = TRUE)
 
 ## Tidy up the data frame
 
-At the first stage of the project, we will perform exploratory analysis and will only work with data from manuscripts, which reported age as mean and standard deviation either directly or via email.
+At the first stage of the project, we will perform an exploratory analysis and will only work with data from manuscripts, which reported age as the mean and standard deviation either directly or via email.
 
-For this we will first select only data where `mean_report` is indicated as YES.
-Then, we will check the structure of the data frame and delete columns which are not necessary, for instance columns that report median.  
-From seeing the structure, we can also see that some data is not stored correctly. For example, `n_noIA` is saved as character when it should be numeric. To overcome this, transform all data that will be used for computation into a numeric class. 
+For this we will first select only data where `mean_report` was labeled as YES.
+Then, we will check the structure of the data frame and delete columns which are not necessary, for instance, columns which report the median and range. 
+
+From seeing the structure of the data frame, we can also notice that some data is not stored correctly. For example, `n_noIA` is saved as a character when it should be numeric. To overcome this, transform all data that will be used for computation into a numeric class.
+
 Display the table.
+
 
 ```r
 data_mean_r <- filter(data_meta, mean_report == "YES", .preserve = TRUE)
@@ -492,7 +495,9 @@ data_mean_rS %>%
 </tbody>
 </table>
 
-Now let's have a look at the patient groups that represent a patient primary disease from each study. By looking at the histogram we can see how many observations we have for each group.
+## Have a quick look at the data
+Now let's have a look at the patient groups, which represent their primary disease reported in each study. By looking at the histogram we can see how many observations we have for each group.
+
 
 ```r
 p1 <- ggplot(data_mean_rS) + geom_bar(aes(x = patient_g)) + coord_flip()
@@ -508,3 +513,210 @@ p1 | p2 | p3
 ```
 
 <img src="meta_analysis1_files/figure-html/unnamed-chunk-2-1.png" width="70%" />
+
+## Calculate effect sizes as the raw mean differences
+We can calculate effect size, presented in this instance as a raw mean difference. We will then pool effect sizes by using the `metafor` package.
+
+```r
+dat1 <- escalc(measure="MD", m1i=m_age_IA, sd1i=SD_IA, n1i=n_IA,
+                              m2i=m_age_noIA, sd2i=SD_noIA, n2i=n_noIA, data=data_mean_rS)
+res1 <- rma(yi, vi, data=dat1)
+res1
+```
+
+```
+## 
+## Random-Effects Model (k = 23; tau^2 estimator: REML)
+## 
+## tau^2 (estimated amount of total heterogeneity): 19.5991 (SE = 8.1896)
+## tau (square root of estimated tau^2 value):      4.4271
+## I^2 (total heterogeneity / total variability):   75.59%
+## H^2 (total variability / sampling variability):  4.10
+## 
+## Test for Heterogeneity:
+## Q(df = 22) = 79.6888, p-val < .0001
+## 
+## Model Results:
+## 
+## estimate      se    zval    pval    ci.lb   ci.ub 
+##   1.2775  1.0926  1.1692  0.2423  -0.8639  3.4188    
+## 
+## ---
+## Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+```
+
+```r
+forest(res1)
+```
+
+![](meta_analysis1_files/figure-html/unnamed-chunk-3-1.png)<!-- -->
+
+## Calculate effect sizes as the standardized mean differences
+Next, the `meta` package will be used to calculate the standardized mean difference.
+
+
+```r
+m.cont <- metacont(n.e = n_IA,
+                   mean.e = m_age_IA,
+                   sd.e = SD_IA,
+                   n.c = n_noIA,
+                   mean.c = m_age_noIA,
+                   sd.c = SD_noIA,
+                   studlab = AUTHORS,
+                   data = data_mean_rS,
+                   sm = "SMD",
+                   method.smd = "Hedges",
+                   comb.fixed = FALSE,
+                   comb.random = TRUE,
+                   method.tau = "REML",
+                   hakn = TRUE,
+                   title = "Age as a risk factor for IA",
+                   prediction = TRUE)
+m.cont
+```
+
+```
+## Review:     Age as a risk factor for IA
+## 
+##                         SMD             95%-CI %W(random)
+## Dellière, S          0.0654 [-0.4112;  0.5420]        4.3
+## Waldeck, F          -0.2848 [-0.9792;  0.4096]        3.0
+## Zou, P               0.2943 [-0.1811;  0.7698]        4.3
+## Lahmer, T           -0.0858 [-0.6971;  0.5254]        3.4
+## Tejerina, EE        -0.3646 [-0.9882;  0.2590]        3.4
+## Napolioni, V        -0.2030 [-0.5026;  0.0967]        5.8
+## Bitterman, R         0.5796 [-0.0493;  1.2084]        3.3
+## Levesque, E          0.0590 [-0.2410;  0.3590]        5.7
+## Huang, L             0.3893 [ 0.0056;  0.7731]        5.1
+## Cook, JC             0.6288 [ 0.1168;  1.1409]        4.1
+## Kaya, S             -0.9118 [-1.2495; -0.5741]        5.4
+## Zhang, X            -0.0453 [-0.3214;  0.2308]        5.9
+## White, PL           -0.3437 [-1.1533;  0.4659]        2.5
+## López-Medrano, F     0.4011 [ 0.0426;  0.7597]        5.3
+## López-Medrano, F     0.1911 [-0.1979;  0.5802]        5.0
+## Nagao, M            -0.1570 [-1.1181;  0.8042]        1.9
+## Heylen, L            0.2484 [-0.1278;  0.6247]        5.1
+## Kurosaki, F          0.4745 [-0.0395;  0.9886]        4.1
+## Chen, J              0.5268 [ 0.0968;  0.9569]        4.7
+## Wauters, J           0.3696 [-0.3774;  1.1166]        2.7
+## Xu, H                0.0997 [-0.3388;  0.5382]        4.6
+## Garnacho-Montero, J  0.1323 [-0.2025;  0.4671]        5.5
+## Muñoz, P             0.2075 [-0.2114;  0.6264]        4.8
+## 
+## Number of studies combined: k = 23
+## 
+##                         SMD            95%-CI    t p-value
+## Random effects model 0.1039 [-0.0552; 0.2630] 1.35  0.1893
+## Prediction interval         [-0.5286; 0.7364]             
+## 
+## Quantifying heterogeneity:
+##  tau^2 = 0.0866 [0.0282; 0.2069]; tau = 0.2943 [0.1680; 0.4548]
+##  I^2 = 65.4% [46.3%; 77.8%]; H = 1.70 [1.36; 2.12]
+## 
+## Test of heterogeneity:
+##      Q d.f.  p-value
+##  63.67   22 < 0.0001
+## 
+## Details on meta-analytical method:
+## - Inverse variance method
+## - Restricted maximum-likelihood estimator for tau^2
+## - Q-profile method for confidence interval of tau^2 and tau
+## - Hartung-Knapp adjustment for random effects model
+## - Hedges' g (bias corrected standardised mean difference)
+```
+
+## Check for potential outliers
+Let's check if our data contains any outliers or influential cases that may affect robustness of the result.
+
+```r
+m.count.no <- find.outliers(m.cont)  
+m.count.no
+```
+
+```
+## Identified outliers (random-effects model) 
+## ------------------------------------------ 
+## "Kaya, S" 
+##  
+## Results with outliers removed 
+## ----------------------------- 
+## Review:     Age as a risk factor for IA
+## 
+##                         SMD             95%-CI %W(random) exclude
+## Dellière, S          0.0654 [-0.4112;  0.5420]        4.2        
+## Waldeck, F          -0.2848 [-0.9792;  0.4096]        2.2        
+## Zou, P               0.2943 [-0.1811;  0.7698]        4.2        
+## Lahmer, T           -0.0858 [-0.6971;  0.5254]        2.8        
+## Tejerina, EE        -0.3646 [-0.9882;  0.2590]        2.7        
+## Napolioni, V        -0.2030 [-0.5026;  0.0967]        7.8        
+## Bitterman, R         0.5796 [-0.0493;  1.2084]        2.6        
+## Levesque, E          0.0590 [-0.2410;  0.3590]        7.8        
+## Huang, L             0.3893 [ 0.0056;  0.7731]        5.7        
+## Cook, JC             0.6288 [ 0.1168;  1.1409]        3.7        
+## Kaya, S             -0.9118 [-1.2495; -0.5741]        0.0       *
+## Zhang, X            -0.0453 [-0.3214;  0.2308]        8.6        
+## White, PL           -0.3437 [-1.1533;  0.4659]        1.7        
+## López-Medrano, F     0.4011 [ 0.0426;  0.7597]        6.3        
+## López-Medrano, F     0.1911 [-0.1979;  0.5802]        5.6        
+## Nagao, M            -0.1570 [-1.1181;  0.8042]        1.2        
+## Heylen, L            0.2484 [-0.1278;  0.6247]        5.9        
+## Kurosaki, F          0.4745 [-0.0395;  0.9886]        3.7        
+## Chen, J              0.5268 [ 0.0968;  0.9569]        4.9        
+## Wauters, J           0.3696 [-0.3774;  1.1166]        2.0        
+## Xu, H                0.0997 [-0.3388;  0.5382]        4.7        
+## Garnacho-Montero, J  0.1323 [-0.2025;  0.4671]        6.8        
+## Muñoz, P             0.2075 [-0.2114;  0.6264]        5.0        
+## 
+## Number of studies combined: k = 22
+## 
+##                         SMD            95%-CI    t p-value
+## Random effects model 0.1594 [ 0.0427; 0.2761] 2.84  0.0098
+## Prediction interval         [-0.1374; 0.4562]             
+## 
+## Quantifying heterogeneity:
+##  tau^2 = 0.0171 [0.0000; 0.0991]; tau = 0.1307 [0.0000; 0.3148]
+##  I^2 = 26.0% [0.0%; 56.1%]; H = 1.16 [1.00; 1.51]
+## 
+## Test of heterogeneity:
+##      Q d.f. p-value
+##  28.38   21  0.1298
+## 
+## Details on meta-analytical method:
+## - Inverse variance method
+## - Restricted maximum-likelihood estimator for tau^2
+## - Q-profile method for confidence interval of tau^2 and tau
+## - Hartung-Knapp adjustment for random effects model
+## - Hedges' g (bias corrected standardised mean difference)
+```
+
+```r
+m.cont.inf <- InfluenceAnalysis(m.cont, random = TRUE)
+```
+
+```
+## [===========================================================================] DONE
+```
+
+```r
+plot(m.cont.inf, "influence")
+```
+
+![](meta_analysis1_files/figure-html/unnamed-chunk-5-1.png)<!-- -->
+
+It seems that the data contains the outlier that has a substantial effect on heterogeneity. 
+
+Let's further check if the removal of any data point from our data frame significantly impacts the overall heterogeneity. 
+
+
+```r
+plot(m.cont.inf, "es")
+```
+
+![](meta_analysis1_files/figure-html/unnamed-chunk-6-1.png)<!-- -->
+
+```r
+plot(m.cont.inf, "i2")
+```
+
+![](meta_analysis1_files/figure-html/unnamed-chunk-6-2.png)<!-- -->
+
