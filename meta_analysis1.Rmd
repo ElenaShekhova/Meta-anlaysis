@@ -147,7 +147,7 @@ data_mean_rT2$Incidence <- incidence_cal(data_mean_rT2, "cohort")
 Now, we will finally arrange a table and choose specific columns that should be there.
 
 ```{r}
-data_mean_rT3 <- select(data_mean_rT2, AUTHORS, YEAR, Underlying_condition, Total_sample_size, study_class, Incidence)
+data_mean_rT3 <- select(data_mean_rT2, AUTHORS, YEAR, Underlying_condition, ICU, Total_sample_size, study_class, Incidence)
 ```
 We have to tidy up the table now. For this, we will fist round values representing incidence and also change the names of the columns. Here, we will start using `%>%`, which is a pipe operator that allows to chain functions together in a convenient fashion. This operator is a part of `dplyr` package. 
 
@@ -161,7 +161,7 @@ data_mean_rT4 <- data_mean_rT3 %>%
 data_mean_rT4 %>%
   kbl() %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"), font_size = 11) %>%
-  column_spec(6, color = "white",
+  column_spec(7, color = "white",
               background = spec_color(data_mean_rT4$Total_sample_size, end = 0.7),
               popover = paste("am:", data_mean_rT4$Total_sample_size)) 
 ```
@@ -293,7 +293,7 @@ data_meta2
 knitr::include_graphics(rep("forestplot_med_del_ou.png", 1))
 ```
 
-Now I want to perform a group analysis and check if patients with hematologic disease had a significantly different age difference than patients with other underlying conditions. 
+Now I want to perform a group analysis and check if infected patients with hematologic disease had a significantly different age difference than patients with other underlying conditions. 
 
 ```{r}
 data_mean_rg_gr <- metacont(n.e = n_IA,
@@ -331,7 +331,25 @@ forest.meta(data_mean_rg_gr,
             label.left = "Younger",
             label.right = "Older")
 dev.off()
-
+data_mean_rg_gr
 knitr::include_graphics(rep("forestplot_med_del_GR.png", 1))
+```
+Clearly, group analysis has shown that in patients with hematologic disease, age does not represent a risk factor for the development of invasive aspergillosis, while in other group we can observe a significant effect size of 0.22. However, the prediction interval in `other` group equals to [-0.0567; 0.5036] which may mean that while  age of patients with IA might be not substantially different from patient without this infection, in other types of patients this difference might be not trivial. To understand which specific parameters may influence the result, we will perform a regression analysis. 
+
+Now I will create two data sets. One will contain all data points. Another will not include data from studies where patient classification was defined as hematologic disease. 
+
+```{r}
+m.gen.reg <- metareg(data_meta2, ~Patient_classification)
+m.gen.reg
+
+m.gen.reg2 <- metareg(data_meta2, ~study_class)
+m.gen.reg2
+
+m.gen.reg3 <- metareg(data_meta2, ~Total_sample_size)
+m.gen.reg3
+```
+
+```{r}
+
 ```
 

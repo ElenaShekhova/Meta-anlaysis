@@ -1,14 +1,14 @@
-prevalence_cal <- function (data, only)
+incidence_cal <- function (data, only)
 {
   noIA <- data$n_noIA
   IA <- data$n_IA
-  prevalence <- IA/(noIA+IA)*100
+  incidence <- IA/(noIA+IA)*100
   
-  result <- ifelse(data$study_class == only, prevalence, NA)
+  result <- ifelse(data$study_class == only, incidence, NA)
   
   return (result)
 }
 
-prevalence_cal(data_mean_rg, "cohort")
+incidence_cal(data_mean_rg, "cohort")
 newdf <- data_mean_rg
-newdf$prevalence <- prevalence_cal(data_mean_rg, "cohort")
+newdf$incidence <- incidence_cal(data_mean_rg, "cohort")
